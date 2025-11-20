@@ -1,32 +1,13 @@
 {
-    "name": "silverstripe/installer",
-    "type": "silverstripe-recipe",
-    "description": "The SilverStripe Framework Installer",
+    "name": "ddev/test-silverstripe",
+    "type": "project",
+    "description": "A basic Silverstripe CMS installation for testing DDEV",
     "require": {
-        "php": "^8.1",
-        "silverstripe/recipe-plugin": "~2.0.0@stable",
-        "silverstripe/vendor-plugin": "~2.0.0@stable",
-        "silverstripe/recipe-cms": "~5.0.0@stable",
-        "silverstripe-themes/simple": "~3.2.0",
-        "silverstripe/login-forms": "~5.0.0@stable"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^9.5"
-    },
-    "extra": {
-        "project-files-installed": [
-            ".htaccess",
-            "app/.htaccess",
-            "app/_config/mimevalidator.yml",
-            "app/_config/mysite.yml",
-            "app/src/Page.php",
-            "app/src/PageController.php"
-        ],
-        "public-files-installed": [
-            ".htaccess",
-            "index.php",
-            "web.config"
-        ]
+        "php": "^8.3",
+        "silverstripe/recipe-cms": "^6",
+        "silverstripe/startup-theme": "^1",
+        "silverstripe/login-forms": "^6",
+        "silverstripe/htmleditor-tinymce": "^1"
     },
     "config": {
         "process-timeout": 600,
