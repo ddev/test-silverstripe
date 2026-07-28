@@ -1,47 +1,138 @@
-# Silverstripe DDEV test repository
+# test-silverstripe for DDEV testing only
 
-This repository is for the DDEV automated testing, and should not be used as a base for a real project. (Although it should work just fine).
+This repo is a fixture consumed by `ddev/ddev`'s own test suite
+(`pkg/ddevapp/ddevapp_test.go`, the Silverstripe case — search for the
+`Name: "TestPkgSilverstripe"` marker rather than trusting any particular
+array index/line number, since that shifts as other test cases are
+added/removed). That test downloads a tagged GitHub release of this repo's
+two assets and expects, in a fresh `ddev` silverstripe project:
 
-## Usage and creation of assets/artifacts
+- `SourceURL` → `silverstripe-base.tar.gz` → the code, vendor, and
+  vendor-exposed public assets, tarred from repo root
+- `DBTarURL` → `db.tar.gz` → a `db.sql` dump, tarred
+- `DynamicURI: "/"` → response body contains a generator meta tag whose
+  version suffix matches whatever `silverstripe/framework` version is
+  actually installed, e.g. `<meta name="generator" content="Silverstripe
+  CMS 6.2">` — see gotcha below, **do not hardcode this**.
 
-To create the artifacts needed for DDEV automated tests, the following steps need to be taken:
+There's no `FilesTarballURL`/upload-dir check for this fixture (unlike the
+sibling `ddev/test-magento2` fixture) — no media/asset upload testing
+happens here.
+
+When you cut a new release here, `ddev/ddev`'s test file (`SourceURL`,
+`DBTarURL`, `DynamicURI.Expect`) needs to be updated to match — that's a
+separate PR in `ddev/ddev`, not this repo.
+
+## Current versions (as of this fixture's last rebuild)
+
+- PHP: 8.3 (`composer.json` constraint is `^8.3`)
+- `silverstripe/recipe-cms`: 6.2.0
+- `silverstripe/framework`: 6.2.2
+- `silverstripe/cms`: 6.2.1
+- Theme: `silverstripe/startup-theme` 1.0.12 (composer-managed, not vendored
+  into git — `.gitignore` excludes `/themes/startup-theme/`)
+
+Check Packagist for whatever's actually latest before assuming these are
+still current — this fixture tracks the relaxed `^6` constraint on
+`recipe-cms`, so a plain `composer update` will drift forward over time.
+
+## To recreate
 
 1. Clone this repository.
-2. Run `composer install` to install the vendor related libraries.
-    1. If you want to update this repository with the latest and greatest libraries available, run `composer update`.
-3. Run `composer vendor-expose` to copy the assets (css and javascripts) to the public folder.
-4. Create a tar.gz from the resulting files in the folder where you cloned the repository to.
-    1. Easiest is to run `tar -czf silverstripe-base.tar.gz .`
-    2. WARNING: Do _not_ include a potential `.ddev/` folder! If you are using DDEV to create the artifacts, ensure the folder is not included
-5. Ensure you have a functioning environment to build your database (May we suggest using DDEV?).
-6. Build the database with `vendor/bin/sake dev/build flush=all`.
-7. Export the database and tar.gz it (`tar -czf db.tar.gz db.sql`).
+2. Spin up DDEV (there is intentionally no `.ddev/` committed — `.gitignore`
+   covers it, and it must never be included in the tarball):
 
-You now have all the artifacts needed to update the Test repository.
+   ```bash
+   ddev config --project-type=silverstripe --docroot=public
+   ddev start
+   ```
 
-Update the repository and release, with the artifacts you created.
+3. Update the vendor libraries:
 
-## Ensure it all works
+   ```bash
+   ddev composer update
+   ```
 
-Update `ddev/pkg/ddevapps/ddevapp_test.go` at the 17th (Silverstripe) test configuration, and point the SourceURL and DBTarURL to the correct location.
+   No `repo.magento.com`-style marketplace credentials needed — all of
+   Silverstripe's packages are public on Packagist.
 
-Run your tests for Silverstripe:
+4. Check what actually got installed, since the generator meta tag must
+   match exactly:
 
-`GOTEST_SHORT=17 make testpkg TESTARGS="-run TestDdevFullSiteSetup"`
+   ```bash
+   ddev exec composer show -s | grep -A1 '^name'
+   grep -o 'silverstripe/framework": "[^"]*"' composer.lock
+   ```
 
-If there are any failures, you can either fix the issues yourself, or get in touch with the team maintaining DDEV. (In case of Silverstripe, contact @Firesphere)
+   **Gotcha:** `<meta name="generator" content="Silverstripe CMS X.Y">` is
+   computed at runtime from whatever `silverstripe/framework` version is
+   actually installed (`SiteTree::getGenerator()` in
+   `silverstripe/silverstripe-cms`, `code/Model/SiteTree.php` — it takes the
+   major.minor of the installed framework version via
+   `preg_match('#^([0-9]+\.[0-9]+)\.[0-9]+$#', ...)`). If `composer update`
+   landed on e.g. `6.3.x`, the new `ddev/ddev` test expectation is
+   `Silverstripe CMS 6.3`, not whatever this README says above.
+
+5. Build the database and confirm the site works:
+
+   ```bash
+   ddev sake dev/build flush=all
+   ddev launch /admin   # confirm login works (admin / password, from .env)
+   ```
+
+   DDEV's silverstripe apptype populates `.env` with the DB connection vars
+   (`SS_DATABASE_*`) and `MAILER_DSN` automatically on `ddev start`/
+   `ddev config` — don't hand-edit those unless you're intentionally
+   changing the fixture's admin credentials.
+
+6. Expose vendor assets into `public/_resources` and build the code tarball:
+
+   ```bash
+   ddev composer vendor-expose
+   tar -czf silverstripe-base.tar.gz --exclude=.ddev --exclude=.git .
+   ```
+
+   `public/_resources` is populated with relative symlinks back into
+   `vendor/` and `themes/` (not copies) — that's fine for this fixture since
+   both directories are tarred up together and the symlinks stay relative.
+   Double-check this hasn't changed with `tar -tvzf silverstripe-base.tar.gz
+   | grep '^l'` — an absolute-path symlink would break on extraction
+   elsewhere (this bit the sibling Magento fixture, whose static-asset
+   symlinks are absolute).
+
+7. Export the database and build the db tarball:
+
+   ```bash
+   ddev export-db --gzip=false --file=db.sql
+   tar -czf db.tar.gz db.sql
+   ```
+
+8. Create a release tagged to match the installed `silverstripe/framework`
+   version (e.g. `6.2.2`) and upload both assets (`gh` CLI required):
+
+   ```bash
+   gh release create 6.2.2 --title 6.2.2 --notes-file notes.txt
+   gh release upload 6.2.2 silverstripe-base.tar.gz db.tar.gz
+   ```
+
+9. Update `ddev/ddev`'s `pkg/ddevapp/ddevapp_test.go` Silverstripe case
+   (`SourceURL`, `DBTarURL`, `DynamicURI.Expect`) to point at the new tag and
+   generator version — confirm who's driving that PR before doing it
+   yourself, it's a separate repo.
 
 ## About Silverstripe
 
-Silverstripe is a New Zealand based organisation, and primary developer of the Open Source CMS and Framework of the same name, with a focus on the CMS user and developer flexibility. It is largely used in governmental environments and has users in New Zealand, Australia, Canada, the Netherlands, Germany and Poland, amongst others.
+Silverstripe is a New Zealand based organisation, and primary developer of
+the Open Source CMS and Framework of the same name, with a focus on the CMS
+user and developer flexibility. It is largely used in governmental
+environments and has users in New Zealand, Australia, Canada, the
+Netherlands, Germany and Poland, amongst others.
 
-For questions about Silverstripe specifically, join the [Silverstripe Users Slack channel](https://www.silverstripe.org/community/slack-signup/). Do not ask questions about Silverstripe here!
+For questions about Silverstripe specifically, join the [Silverstripe Users
+Slack channel](https://www.silverstripe.org/community/slack-signup/). Do not
+ask questions about Silverstripe here!
 
 ## @todo
 
-Add a .github workflow that automatically uploads the artifacts, instead of relying on a manual method.
-
-### Notes
-
-DDEV automated tests are run against Silverstripe CMS 6, though earlier versions are also expected to work. Silverstripe CMS 4's Mailer settings require a custom YML configuration.
-For more information on using DDEV and Silverstripe's email capturing, see https://firesphere.dev/articles/ddevelopment-environment/
+Add a .github workflow that automatically uploads the artifacts, instead of
+relying on a manual method.
