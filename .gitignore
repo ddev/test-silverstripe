@@ -1,3 +1,5 @@
 /silverstripe-cache/
 /vendor/
-.ddev
+.ddev/
+/themes/startup-theme/
+/.vscode/

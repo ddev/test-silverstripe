@@ -12,7 +12,7 @@ To create the artifacts needed for DDEV automated tests, the following steps nee
 3. Run `composer vendor-expose` to copy the assets (css and javascripts) to the public folder.
 4. Create a tar.gz from the resulting files in the folder where you cloned the repository to.
     1. Easiest is to run `tar -czf silverstripe-base.tar.gz .`
-    2. WARNING: Do _not_ include a potential `.ddev` folder! If you are using DDEV to create the artifacts, ensure the folder is not included
+    2. WARNING: Do _not_ include a potential `.ddev/` folder! If you are using DDEV to create the artifacts, ensure the folder is not included
 5. Ensure you have a functioning environment to build your database (May we suggest using DDEV?).
 6. Build the database with `vendor/bin/sake dev/build flush=all`.
 7. Export the database and tar.gz it (`tar -czf db.tar.gz db.sql`).
@@ -20,7 +20,6 @@ To create the artifacts needed for DDEV automated tests, the following steps nee
 You now have all the artifacts needed to update the Test repository.
 
 Update the repository and release, with the artifacts you created.
-
 
 ## Ensure it all works
 
@@ -38,11 +37,11 @@ Silverstripe is a New Zealand based organisation, and primary developer of the O
 
 For questions about Silverstripe specifically, join the [Silverstripe Users Slack channel](https://www.silverstripe.org/community/slack-signup/). Do not ask questions about Silverstripe here!
 
-# @todo
+## @todo
 
 Add a .github workflow that automatically uploads the artifacts, instead of relying on a manual method.
 
 ### Notes
 
-DDEV automated tests are run against Silverstripe CMS 5. Silverstripe CMS 4 works just as well, however, it's Mailer settings require a custom YML configuration.
+DDEV automated tests are run against Silverstripe CMS 6, though earlier versions are also expected to work. Silverstripe CMS 4's Mailer settings require a custom YML configuration.
 For more information on using DDEV and Silverstripe's email capturing, see https://firesphere.dev/articles/ddevelopment-environment/
